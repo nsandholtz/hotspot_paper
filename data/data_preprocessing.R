@@ -1,16 +1,31 @@
-##### Libraries and Data ----
-library(dplyr)
-library(readr)
+# Libraries ----
+library(tidyverse)
 
 # Source helper files ----
 source("~/Dropbox/Luke_Research/human_acquisition/manuscript/section_1/utils.R")
 
-# Set script parameters
-my_experiment <- "experiment_2"
-setwd(paste0("~/Dropbox/Luke_Research/human_acquisition/data/",my_experiment,"/Rdata"))
+
+# Read in raw data --------------------------------------------------------
+
+# raw data parameters
+
+x_origin = 540
+y_origin = 540
+ring_radius = 450
+
+setwd("./data/Rdata")
+
+session_col_names <- c('session_id',
+                       'user_id',
+                       'avg_score',
+                       'final_score',
+                       'max_score',
+                       'time_start',
+                       'total_time',
+                       'num_moves')
 event_col_names <- c('event_id',
                      'session_id',
-                     'trial_number',
+                     'move',
                      'time',
                      'x_loc',
                      'y_loc',
@@ -20,124 +35,46 @@ event_col_names <- c('event_id',
                      'ring_center_x',
                      'ring_center_y',
                      'ring_radius')
-session_col_names <- c('session_id',
-                       'user_id',
-                       'avg_score',
-                       'final_score',
-                       'max_score',
-                       'time_start',
-                       'total_time',
-                       'number_tries')
 
 event_files <- list.files(pattern = "eventrec")
 session_files <- list.files(pattern = "sesrec")
 
-#### Preprocessing ----
+session_dat <- lapply(session_files, read_csv, col_names = session_col_names) %>% 
+  bind_rows() %>%
+  as.data.frame() %>% 
+  select(session_id, user_id, num_moves, max_score)
 
-full_events <- lapply(event_files, read_csv, col_names = F) %>% bind_rows()
-full_session <- lapply(session_files, read_csv, col_names = F) %>% bind_rows()
-event_dat <- data.frame(full_events)
-names(event_dat) <- event_col_names
-session_dat <- data.frame(full_session)
-names(session_dat) <- session_col_names
-
-event_dat = event_dat %>% 
+event_dat <- lapply(event_files, read_csv, col_names = event_col_names) %>% 
+  bind_rows() %>%
+  as.data.frame() %>%
+  mutate(x_loc = x_loc - x_origin,
+         y_loc = y_loc - y_origin,
+         target_x = target_x - x_origin,
+         target_y = target_y - y_origin) %>%
+  select(session_id, event_id, move, x_loc, y_loc, score, target_x, target_y) %>%
   left_join((session_dat %>%
                select(session_id,
                       user_id, 
                       max_score,
-                      number_tries)), 
+                      num_moves)), 
             by = "session_id")
 
-# Getting each move's distance to the hotspot
-event_dat$dist_hotspot <- to_polar((event_dat$x_loc - event_dat$target_x),
-                         (event_dat$y_loc - event_dat$target_y))$dist
-
-# Polar Coordinates -------------------------------------------------------
-
-event_dat$dist <- to_polar((event_dat$x_loc - event_dat$ring_center_x),
-                         (event_dat$y_loc - event_dat$ring_center_y))$dist
-event_dat$rad <- to_polar((event_dat$x_loc - event_dat$ring_center_x),
-                          (event_dat$y_loc - event_dat$ring_center_y),
-                          two_pi = T)$rad
-event_dat$target_dist <- to_polar((event_dat$target_x - event_dat$ring_center_x),
-                                  (event_dat$target_y - event_dat$ring_center_y))$dist
-event_dat$target_rad <- to_polar((event_dat$target_x - event_dat$ring_center_x),
-                          (event_dat$target_y - event_dat$ring_center_y),
-                          two_pi = T)$rad
-
-# Rotated Move 2 ----------------------------------------------------------
-# rotating axis for move two and all moves after that
-
-event_dat$rot_rad <- NA
-event_dat$target_rot_rad <- NA
-for(id in unique(event_dat$user_id)){
-  this_sub <- filter(event_dat, user_id == id)
-  for(sess_id in unique(this_sub$session_id)){
-    round_obs <- which(event_dat$user_id == id & event_dat$session_id == sess_id & event_dat$trial_number >= 1)
-    event_dat$rot_rad[round_obs[-1]] <- event_dat$rad[round_obs[-1]] - event_dat$rad[round_obs[-1]][1]
-    event_dat$target_rot_rad[round_obs] <- event_dat$target_rad[round_obs] - event_dat$rad[round_obs[-1]][1]
-  }
-}
-
-# corrections for greater than 2pi?
-event_dat$rot_rad <- ifelse(event_dat$rot_rad > pi, 
-                          event_dat$rot_rad - 2*pi,
-                          event_dat$rot_rad)
-event_dat$rot_rad <- ifelse(event_dat$rot_rad < -pi,
-                            event_dat$rot_rad + 2*pi,
-                            event_dat$rot_rad)
-event_dat$target_rot_rad <- ifelse(event_dat$target_rot_rad < -pi,
-                            event_dat$target_rot_rad + 2*pi,
-                            event_dat$target_rot_rad)
-event_dat$rot_deg <- rad2deg(event_dat$rot_rad)
+session_dat <- session_dat %>%
+  left_join(event_dat %>% 
+              filter(move == 1) %>%
+              select(session_id, target_x, target_y),
+            by = "session_id")
 
 
+# Creating new variables --------------------------------------------------
 
 
-# Relative to previous move ------------------------------------------------
+# * new vars for session_dat ------------------------------------------------
 
-event_dat$dist_local <- to_polar((event_dat$x_loc - lag(event_dat$x_loc)),
-                                 (event_dat$y_loc - lag(event_dat$y_loc)))$dist
-event_dat$dist_local[event_dat$trial_number == 1] <- NA
-
-event_dat$rad_local <- NA
-for (id in unique(event_dat$user_id)) {
-  this_sub <- filter(event_dat, user_id == id)
-  for (sess_id in unique(this_sub$session_id)) {
-    round_obs <-
-      which(event_dat$user_id == id & event_dat$session_id == sess_id)
-    event_dat$rad_local[round_obs][2] <- 0
-    for (i in 3:length(round_obs)) {
-      event_dat$rad_local[round_obs][i] <-
-        to_polar(
-          event_dat$x_loc[round_obs][i],
-          event_dat$y_loc[round_obs][i],
-          origin_x = event_dat$x_loc[round_obs][i - 1],
-          origin_y = event_dat$y_loc[round_obs][i - 1],
-          two_pi = T
-        )[2] -
-        to_polar(
-          event_dat$x_loc[round_obs][i - 1],
-          event_dat$y_loc[round_obs][i - 1],
-          origin_x = event_dat$x_loc[round_obs][i - 2],
-          origin_y = event_dat$y_loc[round_obs][i - 2],
-          two_pi = T
-        )[2]
-    }
-  }
-}
-
-event_dat$rad_local <- ifelse(event_dat$rad_local > pi, 
-                              event_dat$rad_local - 2*pi,
-                              event_dat$rad_local)
-event_dat$rad_local <- ifelse(event_dat$rad_local < -pi,
-                              event_dat$rad_local + 2*pi,
-                              event_dat$rad_local)
-
-# Getting incremental scores
-event_dat$score_inc <- c(0,diff(event_dat$score))
-event_dat$score_inc[c(1,which(diff(event_dat$trial_number) < 0)+1)] <- NA
+session_dat$target_dist <- to_polar(session_dat$target_x, 
+                                            session_dat$target_y)$dist
+session_dat$target_rad <- to_polar(session_dat$target_x, 
+                                    session_dat$target_y)$rad
 
 # Get reward gradients
 session_dat$reward_gradient <- NA
@@ -146,25 +83,80 @@ for(sess in session_dat$session_id) {
     filter(session_id == sess)
   session_dat$reward_gradient[session_dat$session_id == sess] <- 
     (session_dat$max_score[session_dat$session_id == sess] - 
-       this_session_dat$score[this_session_dat$trial_number == 1])/
-    (this_session_dat$dist_hotspot[this_session_dat$trial_number == 1])
+       this_session_dat$score[this_session_dat$move == 1])/
+    session_dat$target_dist[session_dat$session_id == sess]
 }
 
-#hist(session_dat$reward_gradient)
-
-session_dat$dist_hotspot = event_dat %>% 
-  filter(trial_number == 1) %>%
-  pull(dist_hotspot)
-session_dat$round_max_dist = (session_dat$number_tries - 1) * 20
+session_dat$session_max_dist = (session_dat$num_moves - 1) * 20
 session_dat$init_score = event_dat %>% 
-  filter(trial_number == 1) %>%
+  filter(move == 1) %>%
   pull(score)
-session_dat$target_x = event_dat %>% 
-  filter(trial_number == 1) %>%
-  pull(target_x)
-session_dat$target_y = event_dat %>% 
-  filter(trial_number == 1) %>%
-  pull(target_y)
+
+
+# * new vars for event_dat ------------------------------------------------
+
+# Getting each move's distance to the hotspot
+event_dat$dist_hotspot <- to_polar((event_dat$x_loc - event_dat$target_x),
+                         (event_dat$y_loc - event_dat$target_y))$dist
+
+# Each move / hotspot locaction in polar coordinates
+
+event_dat$dist <- to_polar(event_dat$x_loc,event_dat$y_loc)$dist
+event_dat$rad <- to_polar(event_dat$x_loc,event_dat$y_loc)$rad
+
+event_dat$target_dist <- to_polar(event_dat$target_x, event_dat$target_y)$dist
+event_dat$target_rad <- to_polar(event_dat$target_x, event_dat$target_y)$rad
+
+# rotate data such that move 2 falls on direction of radian = 0
+
+event_dat$rot_rad <- NA
+event_dat$target_rot_rad <- NA
+for(id in unique(event_dat$user_id)){
+  this_sub <- filter(event_dat, user_id == id)
+  for(sess_id in unique(this_sub$session_id)){
+    round_obs <- which(event_dat$user_id == id & event_dat$session_id == sess_id & event_dat$move >= 1)
+    event_dat$rot_rad[round_obs[-1]] <- minuspi_to_pi(event_dat$rad[round_obs[-1]] - event_dat$rad[round_obs[-1]][1])
+    event_dat$target_rot_rad[round_obs] <- minuspi_to_pi(event_dat$target_rad[round_obs] - event_dat$rad[round_obs[-1]][1])
+  }
+}
+
+# calculate changes in dist / angle relative to  to previous move 
+
+event_dat$dist_relative <- to_polar((event_dat$x_loc - lag(event_dat$x_loc)),
+                                 (event_dat$y_loc - lag(event_dat$y_loc)))$dist
+event_dat$dist_relative[event_dat$move == 1] <- NA
+
+event_dat$rad_relative <- NA
+for (id in unique(event_dat$user_id)) {
+  this_sub <- filter(event_dat, user_id == id)
+  for (sess_id in unique(this_sub$session_id)) {
+    round_obs <-
+      which(event_dat$user_id == id & event_dat$session_id == sess_id)
+    event_dat$rad_relative[round_obs][2] <- 0
+    for (i in 3:length(round_obs)) {
+      event_dat$rad_relative[round_obs][i] <-
+        minuspi_to_pi(to_polar(
+          event_dat$x_loc[round_obs][i],
+          event_dat$y_loc[round_obs][i],
+          origin_x = event_dat$x_loc[round_obs][i - 1],
+          origin_y = event_dat$y_loc[round_obs][i - 1]
+        )[2] -
+        to_polar(
+          event_dat$x_loc[round_obs][i - 1],
+          event_dat$y_loc[round_obs][i - 1],
+          origin_x = event_dat$x_loc[round_obs][i - 2],
+          origin_y = event_dat$y_loc[round_obs][i - 2]
+        )[2]
+        )
+    }
+  }
+}
+
+# change in score
+
+event_dat$delta_score <- c(0,diff(event_dat$score))
+event_dat$delta_score[c(1,which(diff(event_dat$move) < 0)+1)] <- NA
+
 
 # Alternate subject labels ----
 
@@ -179,22 +171,34 @@ session_dat = session_dat %>%
 
 
 # Round indexes
-session_dat = session_dat %>% group_by(alt_id) %>% mutate(round_index=1:n())
+session_dat = session_dat %>% 
+  group_by(alt_id) %>% 
+  mutate(round_index=1:n()) %>%
+  select(alt_id, user_id, round_index, session_id, num_moves, 
+         target_x, target_y, target_dist, target_rad, 
+         reward_gradient, session_max_dist, max_score, init_score)
 
 event_dat = event_dat %>% 
   left_join((session_dat %>%
               ungroup() %>%
                select(session_id, 
                       round_index)),
-            by = "session_id")
+            by = "session_id") %>%
+  select(alt_id, user_id, round_index, num_moves, event_id, session_id, move, 
+         x_loc, y_loc, dist, rad, rot_rad, dist_relative, rad_relative,
+         score, delta_score, dist_hotspot, max_score, target_x, target_y, 
+         target_dist, target_rad, target_rot_rad)
 
-#### Save data ---- 
+plot(event_dat %>%
+       filter(alt_id == 28, move == 2) %>%
+       pull(delta_score),
+     event_dat %>%
+       filter(alt_id == 28, move == 3) %>%
+       pull(rad_relative))
+
+# Save data ---- 
 saveRDS(session_dat,
-        file = paste0("~/Dropbox/Luke_Research/human_acquisition/data/",
-                      my_experiment,
-                      "/session_dat.rds"))
+        file = "~/Research/hotspot_paper/data/session_dat.rds")
 saveRDS(event_dat,
-        file = paste0("~/Dropbox/Luke_Research/human_acquisition/data/",
-                      my_experiment,
-                      "/event_dat.rds"))
+        file = "~/Research/hotspot_paper/data/event_dat.rds")
 
