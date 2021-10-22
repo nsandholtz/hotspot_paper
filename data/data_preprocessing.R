@@ -2,7 +2,7 @@
 library(tidyverse)
 
 # Source helper files ----
-source("~/Dropbox/Luke_Research/human_acquisition/manuscript/section_1/utils.R")
+source("./analysis/utils.R")
 
 
 # Read in raw data --------------------------------------------------------
@@ -42,15 +42,18 @@ session_files <- list.files(pattern = "sesrec")
 session_dat <- lapply(session_files, read_csv, col_names = session_col_names) %>% 
   bind_rows() %>%
   as.data.frame() %>% 
+  mutate(num_moves = num_moves - 1) %>% # Re-index moves such that the initial starting point of each round is "move 0"
   select(session_id, user_id, num_moves, max_score)
 
 event_dat <- lapply(event_files, read_csv, col_names = event_col_names) %>% 
   bind_rows() %>%
   as.data.frame() %>%
-  mutate(x_loc = x_loc - x_origin,
+  mutate(x_loc = x_loc - x_origin, # set origin to (0,0)
          y_loc = y_loc - y_origin,
          target_x = target_x - x_origin,
-         target_y = target_y - y_origin) %>%
+         target_y = target_y - y_origin,
+         move = move - 1, # Re-index moves such that the initial starting point of each round is "move 0"
+         ) %>%
   select(session_id, event_id, move, x_loc, y_loc, score, target_x, target_y) %>%
   left_join((session_dat %>%
                select(session_id,
@@ -61,7 +64,7 @@ event_dat <- lapply(event_files, read_csv, col_names = event_col_names) %>%
 
 session_dat <- session_dat %>%
   left_join(event_dat %>% 
-              filter(move == 1) %>%
+              filter(move == 0) %>%
               select(session_id, target_x, target_y),
             by = "session_id")
 
@@ -83,13 +86,13 @@ for(sess in session_dat$session_id) {
     filter(session_id == sess)
   session_dat$reward_gradient[session_dat$session_id == sess] <- 
     (session_dat$max_score[session_dat$session_id == sess] - 
-       this_session_dat$score[this_session_dat$move == 1])/
+       this_session_dat$score[this_session_dat$move == 0])/
     session_dat$target_dist[session_dat$session_id == sess]
 }
 
-session_dat$session_max_dist = (session_dat$num_moves - 1) * 20
+session_dat$session_max_dist = (session_dat$num_moves) * 20
 session_dat$init_score = event_dat %>% 
-  filter(move == 1) %>%
+  filter(move == 0) %>%
   pull(score)
 
 
@@ -114,7 +117,7 @@ event_dat$target_rot_rad <- NA
 for(id in unique(event_dat$user_id)){
   this_sub <- filter(event_dat, user_id == id)
   for(sess_id in unique(this_sub$session_id)){
-    round_obs <- which(event_dat$user_id == id & event_dat$session_id == sess_id & event_dat$move >= 1)
+    round_obs <- which(event_dat$user_id == id & event_dat$session_id == sess_id & event_dat$move >= 0)
     event_dat$rot_rad[round_obs[-1]] <- minuspi_to_pi(event_dat$rad[round_obs[-1]] - event_dat$rad[round_obs[-1]][1])
     event_dat$target_rot_rad[round_obs] <- minuspi_to_pi(event_dat$target_rad[round_obs] - event_dat$rad[round_obs[-1]][1])
   }
@@ -124,7 +127,7 @@ for(id in unique(event_dat$user_id)){
 
 event_dat$dist_relative <- to_polar((event_dat$x_loc - lag(event_dat$x_loc)),
                                  (event_dat$y_loc - lag(event_dat$y_loc)))$dist
-event_dat$dist_relative[event_dat$move == 1] <- NA
+event_dat$dist_relative[event_dat$move == 0] <- NA
 
 event_dat$rad_relative <- NA
 for (id in unique(event_dat$user_id)) {
@@ -170,7 +173,7 @@ session_dat = session_dat %>%
   left_join(label_tool, by = "user_id")
 
 
-# Round indexes
+# Round indexes ----
 session_dat = session_dat %>% 
   group_by(alt_id) %>% 
   mutate(round_index=1:n()) %>%
@@ -190,15 +193,17 @@ event_dat = event_dat %>%
          target_dist, target_rad, target_rot_rad)
 
 plot(event_dat %>%
-       filter(alt_id == 28, move == 2) %>%
+       filter(alt_id == 28, move == 1) %>%
        pull(delta_score),
      event_dat %>%
-       filter(alt_id == 28, move == 3) %>%
+       filter(alt_id == 28, move == 2) %>%
        pull(rad_relative))
 
+
 # Save data ---- 
+setwd("~/Research/hotspot_paper")
 saveRDS(session_dat,
-        file = "~/Research/hotspot_paper/data/session_dat.rds")
+        file = "./data/session_dat.rds")
 saveRDS(event_dat,
-        file = "~/Research/hotspot_paper/data/event_dat.rds")
+        file = "./data/event_dat.rds")
 

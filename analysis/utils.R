@@ -17,7 +17,7 @@ minuspi_to_pi <- function(x) {
   y - pi
 }  
 
-# Convert (x,y) and an Origin, into radians and radius
+# Convert cartesian (x,y) and an origin, into radians and radius
 to_polar <- function(x,y,origin_x = 0, origin_y = 0, two_pi = T){
   dist <- sqrt((x-origin_x)^2 + (y-origin_y)^2)
   if(two_pi == T){
@@ -29,15 +29,20 @@ to_polar <- function(x,y,origin_x = 0, origin_y = 0, two_pi = T){
   if(length(x) == 1) return(c(dist,rad))
 }
 
-# Convert radians to degrees
-rad2deg <- function(rad) {(rad * 180) / (pi)}
-
-# convert (radius, radians) to (x,y)
-to_cart <- function(r,theta){
-  x <- r*cos(theta)
-  y <- r*sin(theta)
-  return(cbind.data.frame(x,y))
+# Calculate reward of a location, given gradient, initial score, and hotspot
+calc_reward <- function(loc_x, 
+                   loc_y,
+                   hotspot_x,
+                   hotspot_y, 
+                   grad,
+                   R_0, 
+                   origin_x = 0, 
+                   origin_y = 0){
+  my_reward <- R_0 + grad*(sqrt((origin_x-hotspot_x)^2 + (origin_y-hotspot_y)^2) - 
+                                  sqrt((loc_x-hotspot_x)^2 + (loc_y-hotspot_y)^2))
+  return(my_reward)
 }
+
 
 
 get_opt_angle = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot){
@@ -56,6 +61,32 @@ get_opt_xy = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot, r = 20){
   trans_x = to_cart(r = r, theta = opt_angle)$x + x_rot
   trans_y = to_cart(r = r, theta = opt_angle)$y + y_rot
   return(c(trans_x, trans_y))
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Convert radians to degrees
+rad2deg <- function(rad) {(rad * 180) / (pi)}
+
+# convert (radius, radians) to (x,y)
+to_cart <- function(r,theta){
+  x <- r*cos(theta)
+  y <- r*sin(theta)
+  return(cbind.data.frame(x,y))
 }
 
 # Function to compute log-likelihood
@@ -612,15 +643,6 @@ max_score = function(hotspot_x, hotspot_y, grad,
   }
 }
 
-# Calculates the reward of a mouse click, given
-# the gradient, origin, and hotspot location.
-reward <- function(mouse_x, mouse_y, hotspot_x, hotspot_y, 
-                   R_0 = 200, grad = runif(1,15,75), 
-                   origin_x = 960, origin_y = 540){
-  my_reward <- R_0 + (grad/20)*(sqrt((origin_x-hotspot_x)^2 + (origin_y-hotspot_y)^2) - 
-                                  sqrt((mouse_x-hotspot_x)^2 + (mouse_y-hotspot_y)^2))
-  return(my_reward)
-}
 
 
 # REWARD SURFACE METROPOLIS ESTIMATION --------------------------------------------
