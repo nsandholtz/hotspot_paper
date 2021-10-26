@@ -43,16 +43,15 @@ calc_reward <- function(loc_x,
   return(my_reward)
 }
 
-
-
-get_opt_angle = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot){
-  opt_angle = to_polar(x = hotspot_x_rot,
-                       y = hotspot_y_rot,
-                       origin_x = r_rot,
-                       origin_y = y_rot)[2]
-  return(opt_angle)
+# convert (radius, radians) to (x,y)
+to_cart <- function(r,theta){
+  x <- r*cos(theta)
+  y <- r*sin(theta)
+  return(cbind.data.frame(x,y))
 }
 
+# For a given x,y pair (rotated) and hotspot (rotated), find the optimal 
+# coordinates of the next move (i.e. directly toward the hotspot)
 get_opt_xy = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot, r = 20){
   opt_angle = to_polar(x = hotspot_x_rot,
                        y = hotspot_y_rot,
@@ -64,30 +63,103 @@ get_opt_xy = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot, r = 20){
 }
 
 
+# INFERENCE FUNCTIONS -----------------------------------------------------
+
+infer_surface_1 <- function(x1 = 20, y1 = 0,
+                            r1,
+                            r_sig, 
+                            beta_Sig,
+                            init_score,
+                            beta_mu = c(0,0),
+                            projection_grid){
+  X = t(c(x1, y1))
+  post_Prec <- (1/r_sig^2) * t(X) %*% X + solve(beta_Sig)
+  post_Sig <- solve(post_Prec)
+  post_mu <- post_Sig %*% ((1/r_sig^2) * t(X) %*% (r1 - init_score) + solve(beta_Sig) %*% beta_mu)
+  
+  projection_grid$post_pred_mu <- apply(projection_grid[,c("x", "y")], 1,
+                                        function(x) x %*% post_mu + init_score)
+  projection_grid$post_pred_sig <- apply(projection_grid[,c("x", "y")], 1,
+                                         function(x) sqrt(t(x) %*% post_Sig %*% x + r_sig^2))
+  return(projection_grid)
+}  
+
+infer_surface_n <- function(X,
+                            r,
+                            r_sig, 
+                            beta_Sig,
+                            init_score,
+                            beta_mu = c(0,0),
+                            projection_grid){
+  
+  post_Prec <- (1/r_sig^2) * t(X) %*% X + solve(beta_Sig)
+  post_Sig <- solve(post_Prec)
+  post_mu <- post_Sig %*% ((1/r_sig^2) * t(X) %*% (r - init_score) + solve(beta_Sig) %*% beta_mu)
+  
+  projection_grid$post_pred_mu <- apply(projection_grid[,c("x", "y")], 1,
+                                        function(x) x %*% post_mu + init_score)
+  projection_grid$post_pred_sig <- apply(projection_grid[,c("x", "y")], 1,
+                                         function(x) sqrt(t(x) %*% post_Sig %*% x + r_sig^2))
+  return(projection_grid)
+}  
+
+
+
+# ACQUISITON FUNCTIONS ----------------------------------------------------
+
+acquire_pi = function(post_pred_mu, 
+                      post_pred_sig,
+                      r1,
+                      xi_val,
+                      init_score){
+  lambda <- (post_pred_mu - max(init_score, r1) - xi_val)/post_pred_sig
+  pi_surface <- pnorm(lambda)
+  return(pi_surface)
+}
+
+acquire_ei = function(post_pred_mu, 
+                      post_pred_sig,
+                      r1,
+                      xi_val,
+                      init_score){
+  lambda <- (post_pred_mu - max(init_score, r1) - xi_val)/post_pred_sig
+  ei_surface <- post_pred_sig * (pnorm(lambda)*lambda + dnorm(lambda))
+  return(ei_surface)
+}
+
+acquire_ucb = function(post_pred_mu, 
+                       post_pred_sig,
+                       quant
+){
+  ucb_surface <- qnorm(p = quant, 
+                       post_pred_mu, 
+                       post_pred_sig)
+  return(ucb_surface)
+}
 
 
 
 
 
 
+# UNUSED ------------------------------------------------------------------
 
 
 
 
-
-
+get_opt_angle = function(x_rot, y_rot, hotspot_x_rot, hotspot_y_rot){
+  opt_angle = to_polar(x = hotspot_x_rot,
+                       y = hotspot_y_rot,
+                       origin_x = r_rot,
+                       origin_y = y_rot)[2]
+  return(opt_angle)
+}
 
 
 
 # Convert radians to degrees
 rad2deg <- function(rad) {(rad * 180) / (pi)}
 
-# convert (radius, radians) to (x,y)
-to_cart <- function(r,theta){
-  x <- r*cos(theta)
-  y <- r*sin(theta)
-  return(cbind.data.frame(x,y))
-}
 
 # Function to compute log-likelihood
 aquisition_log_lik = function(data_vec, 
@@ -111,80 +183,8 @@ aquisition_log_lik = function(data_vec,
 
 # FASTER VERSIONS ---------------------------------------------------------
 
-infer_surface_1 <- function(x1 = 20, y1 = 0,
-                            r1,
-                            r_sig, 
-                            beta_Sig,
-                            init_score = 200,
-                            beta_mu = c(0,0),
-                            projection_grid){
-  
-  #projection_grid$x = projection_grid$x + x1
-  #projection_grid$y = projection_grid$y + y1
-  
-  X = t(c(x1, y1))
-  post_Prec <- (1/r_sig^2) * t(X) %*% X + solve(beta_Sig)
-  post_Sig <- solve(post_Prec)
-  post_mu <- post_Sig %*% ((1/r_sig^2) * t(X) %*% (r1 - init_score) + solve(beta_Sig) %*% beta_mu)
-  
-  projection_grid$post_pred_mu <- apply(projection_grid[,c("x", "y")], 1,
-                                        function(x) x %*% post_mu + init_score)
-  projection_grid$post_pred_sig <- apply(projection_grid[,c("x", "y")], 1,
-                                         function(x) sqrt(t(x) %*% post_Sig %*% x + r_sig^2))
-  return(projection_grid)
-}  
 
-infer_surface_n <- function(X,
-                            r,
-                            r_sig, 
-                            beta_Sig,
-                            init_score = 200,
-                            beta_mu = c(0,0),
-                            projection_grid){
-  
-  post_Prec <- (1/r_sig^2) * t(X) %*% X + solve(beta_Sig)
-  post_Sig <- solve(post_Prec)
-  post_mu <- post_Sig %*% ((1/r_sig^2) * t(X) %*% (r - init_score) + solve(beta_Sig) %*% beta_mu)
-  
-  projection_grid$post_pred_mu <- apply(projection_grid[,c("x", "y")], 1,
-                                        function(x) x %*% post_mu + init_score)
-  projection_grid$post_pred_sig <- apply(projection_grid[,c("x", "y")], 1,
-                                         function(x) sqrt(t(x) %*% post_Sig %*% x + r_sig^2))
-  return(projection_grid)
-}  
 
-acquire_pi = function(post_pred_mu, 
-                      post_pred_sig,
-                      r1,
-                      xi_val,
-                      init_score = 200){
-  lambda <- (post_pred_mu - max(init_score, r1) - xi_val)/post_pred_sig
-  pi_surface <- pnorm(lambda)
-  return(pi_surface)
-}
-
-acquire_ei = function(post_pred_mu, 
-                      post_pred_sig,
-                      r1,
-                      xi_val,
-                      init_score = 200){
-  lambda <- (post_pred_mu - max(init_score, r1) - xi_val)/post_pred_sig
-  ei_surface <- post_pred_sig * (pnorm(lambda)*lambda + dnorm(lambda))
-  return(ei_surface)
-}
-
-acquire_ucb = function(post_pred_mu, 
-                       post_pred_sig,
-                       #r1,
-                       #init_score = 200,
-                       quant
-){
-  #ucb_surface <- post_pred_mu + kappa * post_pred_sig
-  ucb_surface <- qnorm(p = quant, 
-                       post_pred_mu, 
-                       post_pred_sig)
-  return(ucb_surface)
-}
 
 acquire_pi_curve = function(x1 = 20, y1 = 0,
                             r1_vals,
