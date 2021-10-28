@@ -13,7 +13,7 @@ x_origin = 540
 y_origin = 540
 ring_radius = 450
 
-setwd("./data/Rdata")
+setwd("./data/raw_data")
 
 session_col_names <- c('session_id',
                        'user_id',
