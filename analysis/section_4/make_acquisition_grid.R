@@ -28,23 +28,25 @@ for(i in 1:length(r1_grid)) {
         ucb_surface = matrix(NA, length(r1_grid), angle_resolution)
       )
     }
-    for(k in 1:3){
-      if(k %in% c(1,2)){
-        acquisition_surfaces[[j]][[k]][i, ] = acquire_pi(
-          post_pred_mu = inferred_surface$post_pred_mu,
-          post_pred_sig = inferred_surface$post_pred_sig,
-          r1 = r1_grid[i],
-          xi_val = par_vals[[k]][j],
-          init_score = 0
-        )
-      } else {
-        acquisition_surfaces[[j]][[k]][i, ] = acquire_ucb(
-          post_pred_mu = inferred_surface$post_pred_mu,
-          post_pred_sig = inferred_surface$post_pred_sig,
-          quant = par_vals[[k]][j]
-        )
-      }
-    }
+    acquisition_surfaces[[j]][[1]][i,] = acquire_pi(
+      post_pred_mu = inferred_surface$post_pred_mu,
+      post_pred_sig = inferred_surface$post_pred_sig,
+      r1 = r1_grid[i],
+      xi_val = par_vals[[1]][j],
+      init_score = 0
+    )
+    acquisition_surfaces[[j]][[2]][i,] = acquire_ei(
+      post_pred_mu = inferred_surface$post_pred_mu,
+      post_pred_sig = inferred_surface$post_pred_sig,
+      r1 = r1_grid[i],
+      xi_val = par_vals[[2]][j],
+      init_score = 0
+    )
+    acquisition_surfaces[[j]][[3]][i,] = acquire_ucb(
+      post_pred_mu = inferred_surface$post_pred_mu,
+      post_pred_sig = inferred_surface$post_pred_sig,
+      quant = par_vals[[3]][j]
+    )
   }
 }
 

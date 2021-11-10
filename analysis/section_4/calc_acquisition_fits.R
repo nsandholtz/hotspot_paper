@@ -16,11 +16,11 @@ session_dat <- readRDS("./data/session_dat.rds")
 first_n = 20
 
 ok_sessions = session_dat %>%
-  dplyr::filter(round_index > first_n,
+  filter(round_index > first_n,
                 target_dist > session_max_dist)
 
 ok_event_dat = event_dat %>%
-  dplyr::filter(session_id %in% ok_sessions$session_id) 
+  filter(session_id %in% ok_sessions$session_id) 
 
 # Read in argmax grids
 
@@ -30,21 +30,19 @@ acquisition_grid = readRDS(file = "./analysis/section_4/model_output/acquisition
 
 acquisition_fits = list()
 
-for(my_sub in unique(event_dat$alt_id)) {
+for(my_sub in unique(ok_event_dat$alt_id)) {
   cat(my_sub,"\r")
   # Get the rewards from move 1
-  rewards_1 = event_dat %>%
-    dplyr::filter(session_id %in% ok_sessions$session_id,
-                  alt_id == my_sub,
+  rewards_1 = ok_event_dat %>%
+    filter(alt_id == my_sub,
                   move == 1) %>%
-    dplyr::pull(delta_score) 
+    pull(delta_score) 
   
   # Calculate the targets in absolute value radians
   
-  targets = event_dat %>%
-    dplyr::mutate(lead_rad_relative = lead(rad_relative)) %>%
-    filter(session_id %in% ok_sessions$session_id,
-           alt_id == my_sub,
+  targets = ok_event_dat %>%
+    mutate(lead_rad_relative = lead(rad_relative)) %>%
+    filter(alt_id == my_sub,
            move == 1) %>%
     pull(lead_rad_relative)
   
@@ -63,15 +61,15 @@ for(my_sub in unique(event_dat$alt_id)) {
       r1_grid = r1_grid,
       acquisition_grid_ = acquisition_grid[[i]],
       par_vals_ = par_vals[[i]],
-      scale_vals_ = scale_vals
-    ) %>% 
-      mutate(likelihood = exp(log_lik),
-             prior_prob = (1/3)/nrow(.), # Discrete uniform priors 
-             post_prob_un = likelihood * prior_prob,
-             log_post_prob_un = log_lik + log(prior_prob),
-             acq_type = acq_types[i])
+      scale_vals_ = scale_vals) %>% 
+      mutate(acq_type = acq_types[i]) 
   }
-  full_fits = rbindlist(full_fits)
+  full_fits = rbindlist(full_fits) %>% 
+    mutate(likelihood = exp(log_lik),
+           prior_prob = 1/nrow(.), # Discrete uniform priors 
+           post_prob_un = likelihood * prior_prob,
+           log_post_prob_un = log_lik + log(prior_prob),
+    )
   
   log_norm_const = matrixStats::logSumExp(full_fits$log_post_prob_un)
   
@@ -83,15 +81,13 @@ for(my_sub in unique(event_dat$alt_id)) {
   model_sorter = full_fits %>%
     group_by(acq_type, par_val) %>%
     summarise(marg_like = sum(likelihood),
-              marg_prior = sum(prior_prob),
-              marg_post_un = sum(post_prob_un),
               marg_post_norm = sum(post_prob_norm)) %>%
     ungroup() %>%
     arrange(desc(marg_post_norm)) %>%
     mutate(cum_post_prob = cumsum(marg_post_norm)) 
   
   acquisition_fits[[my_sub]] = list()
-  acquisition_fits[[my_sub]]$posterior = model_sorter
+  acquisition_fits[[my_sub]]$posterior = model_sorter[model_sorter$marg_post_norm > 1e-10, ]
   acquisition_fits[[my_sub]]$MAP = full_fits[which.max(full_fits$log_post_prob_un),]
   
   # Out of sample log like
@@ -111,5 +107,4 @@ for(my_sub in unique(event_dat$alt_id)) {
 }
 
 saveRDS(acquisition_fits, "./analysis/section_4/model_output/acquisition_fits.rds")
-
 
