@@ -1,4 +1,4 @@
-**<p align="center"> Inverse Bayesian Optimization: Learning Human Search Strategies in a Sequential Optimization Task</p>**
+**<p align="center"> Inverse Bayesian Optimization: Learning Human Acquisition Functions in an Exploration vs Exploitation Search Task</p>**
 
 *<p align="center"> A Companion Repository </p>*
 
