@@ -42,7 +42,6 @@ move_1 = ggplot() +
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank(),
-       # plot.background = element_rect(color = "black"),
         plot.title = element_text(hjust = 0.5)
   ) +
   geom_segment(aes(x = x1, y = y1, xend = x2, yend = y2),
@@ -117,7 +116,6 @@ move_2 = ggplot() +
         axis.text = element_blank(),
         axis.ticks = element_blank(),
         axis.title = element_blank(),
-        #plot.background = element_rect(color = "black"),
         plot.title = element_text(hjust = 0.5)
   ) + 
   geom_segment(aes(x = x1, y = y1, xend = x2, yend = y2),
@@ -196,11 +194,11 @@ move_2 = ggplot() +
 move_2
 
 # Requires X quartz
-cairo_pdf("./figures/section_2/Move_1_diagram.pdf",height = 4, family="Arial Unicode MS")
-grid.arrange(move_1, nrow = 1)
-dev.off()
-
-cairo_pdf("./figures/section_2/Move_2_diagram.pdf",height = 4, family="Arial Unicode MS")
-grid.arrange(move_2, nrow = 1)
-dev.off()
+# cairo_pdf("./figures/section_2/Move_1_diagram.pdf",height = 4, family="Arial Unicode MS")
+# grid.arrange(move_1, nrow = 1)
+# dev.off()
+# 
+# cairo_pdf("./figures/section_2/Move_2_diagram.pdf",height = 4, family="Arial Unicode MS")
+# grid.arrange(move_2, nrow = 1)
+# dev.off()
 

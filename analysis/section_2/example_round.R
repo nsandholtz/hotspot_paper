@@ -50,17 +50,17 @@ example_round = ggplot2::ggplot(example_events, aes(x_loc, y_loc, label = for_te
                             nudge_y = 100,
                             nudge_x = -50,
                             label.padding = .5) +
-  #ggplot2::geom_point(aes(x_loc, y_loc), data = example_events[1,], color = "blue", size = .75) + 
   coord_equal() + 
   theme_void() +
   theme(plot.title = element_text(hjust = 0.5))
-  #ggtitle(paste("Example Round\n Subject:", example_info$alt_id))
-  #ggtitle(paste("Example Round"))
 print(example_round)
 
 
-pdf(file = "./figures/section_2/example_round.pdf",
-    width = 8, height = 8)
-example_round
-dev.off()
+# Print to file -----------------------------------------------------------
+
+# 
+# pdf(file = "./figures/section_2/example_round.pdf",
+#     width = 8, height = 8)
+# example_round
+# dev.off()
 
