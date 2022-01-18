@@ -71,7 +71,6 @@ global_surf = ggplot(my_resh1, aes(x, y)) +
   geom_circle(aes(x0=x, y0=y, r=r), data = circle2, color = "green4", inherit.aes = F) +
   coord_equal() + 
   annotate("text", x = -175, y = 0, label = "Move 1\nboundary") + 
-  #theme_minimal() +
   theme_void() +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
@@ -80,8 +79,6 @@ global_surf = ggplot(my_resh1, aes(x, y)) +
         legend.key.width=unit(1,"cm")) +
   guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) +
   ggtitle("Global Objective Function")
-
-
 
 # Local reward surface ----------------------------------------------------
 
@@ -117,7 +114,6 @@ local_surf = ggplot(my_resh2,
               interpolate=F) + 
   ggplot2::scale_fill_gradientn(colors = rev(RColorBrewer::brewer.pal(11, "RdYlBu")),
                                 name = "Reward (rescaled) "
-                                #breaks = seq(370,430, by = 10)
                                 ) +
   geom_circle(aes(x0=x, 
                   y0=y,
@@ -138,9 +134,9 @@ local_surf = ggplot(my_resh2,
 
 
 # Save plots
-pdf(file = "./figures/section_3/reward_surface.pdf",
-    width = 10*.8, height = 6*.8)
-cowplot::plot_grid(global_surf, local_surf, nrow = 1)
-dev.off()
+# pdf(file = "./figures/section_3/reward_surface.pdf",
+#     width = 10*.8, height = 6*.8)
+# cowplot::plot_grid(global_surf, local_surf, nrow = 1)
+# dev.off()
 
 

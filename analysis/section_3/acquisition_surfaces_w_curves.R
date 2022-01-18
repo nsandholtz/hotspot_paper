@@ -72,7 +72,6 @@ for(i in 1:length(delta_r)){
                                             quant = quant_val)
 }
 
-
 # GET maxes of acquisition surfaces for each value of delta_r 
 
 acquisition_maxes = list()
@@ -81,8 +80,6 @@ for(i in 1:3) {
     delta_r = delta_r,
     angle = theta_indexes[apply(acquisition_grid[[i]], 1, which.max)])
 }
-
-
 
 # Plotting ----------------------------------------------------------------
 
@@ -164,16 +161,29 @@ for(i in 1:3){
           legend.position = "bottom",
           legend.text = element_text(angle = 45),
           legend.key.width=unit(1,"cm")) +
+    ggplot2::theme(panel.border = element_rect(
+                     colour = "gray",
+                     fill = NA,
+                     size = 1
+                   ),
+                   plot.margin = margin(5.5, -2.5, 5.5, 5.5, "pt")) + 
+    {if(i != 1 )  theme(axis.title.y=element_blank(),
+                        axis.text.y=element_blank(),
+                        axis.ticks.y=element_blank())}+
+    {if(i != 2 )  theme(axis.title.x=element_text(color = gray(1,0)),)} + 
+    {if(i == 2 )  theme( plot.margin = margin(5.5, -2.5, 10.5, 5.5, "pt"))}+
+    {if(i == 3 )  theme( plot.margin = margin(5.5, 7, 5.5, 5.5, "pt"))}+
     guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) +
     ggplot2::labs(title = plot_titles[i],
          subtitle = bquote(.(sub_titles[[i]])))
 }
 
-pdf(file = "./figures/section_3/acquisition_surfaces_w_curves.pdf",
-    width = 8, height = 4)
-cowplot::plot_grid(acquisition_plots[[1]], 
-                   acquisition_plots[[2]],
-                   acquisition_plots[[3]],
-                   nrow = 1)
-dev.off()
+# pdf(file = "./figures/section_3/acquisition_surfaces_w_curves.pdf",
+#     width = 8, height = 4.5)
+# cowplot::plot_grid(acquisition_plots[[1]], 
+#                    acquisition_plots[[2]],
+#                    acquisition_plots[[3]],
+#                    rel_widths = c(1.175,.95,1),
+#                    nrow = 1)
+# dev.off()
 

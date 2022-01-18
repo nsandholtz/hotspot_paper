@@ -1,9 +1,9 @@
 library(dplyr)
 library(ggforce)
-source("~/Dropbox/Luke_Research/human_acquisition/manuscript/section_1/utils.R")
 
 # Source utilities
 source("./analysis/utils.R")
+source("./analysis/constants.R")
 
 # LOAD DATA ---------------------------------------------------------------
 
@@ -46,7 +46,7 @@ circ_mesh_rad = dplyr::filter(my_mesh_rad,dist <= 20)
 # Infer the reward surface using the bayesian linear model
 inferred_surface = infer_surface_1(x1 = 20, y1 = 0,
                                    r1 = example_events$score[2],
-                                   r_sig = r_sig,
+                                   r_sig = rew_sig,
                                    beta_Sig = diag(1, nrow = 2),
                                    init_score = example_events$score[1],
                                    projection_grid = circ_mesh_rad[,c("x", "y")])
@@ -64,7 +64,6 @@ m2_opt_xy = get_opt_xy(x_rot = 20,
 # Calculate acquisition surfaces -----
 
 # Set acquisition params 
-r_sig <- .01
 xi_val = 1
 quant_val = .95
 
@@ -142,19 +141,25 @@ local_pi = ggplot2::ggplot(circ_mesh_rad, aes(x, y)) +
                       size = 10) +
   coord_equal() + 
   theme_minimal() +
+  ggplot2::theme(panel.border = element_rect(
+                   colour = "gray",
+                   fill = NA,
+                   size = 1
+                 ),
+                 plot.margin = margin(5.5, -2.5, 5.5, 5.5, "pt")) + 
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         legend.position = "bottom",
         legend.text = element_text(angle = 45),
         legend.key.width=unit(1,"cm")) +
+  theme(axis.title.x=element_text(color = gray(1,0))) + 
   guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) +
   labs(title="Move 2 PI Surface",
        subtitle=bquote(xi["PI"] ~ " = " ~ .(xi_val)))
 
 
 # EI plot -----------------------------------------------------------------
-
-
+  
 local_ei = ggplot2::ggplot(circ_mesh_rad, aes(x, y)) + 
   geom_circle(aes(x0=x, y0=y, r=r), 
               data = circle0, 
@@ -195,11 +200,20 @@ local_ei = ggplot2::ggplot(circ_mesh_rad, aes(x, y)) +
                       size = 10) +
   coord_equal() + 
   theme_minimal() +
+  ggplot2::theme(panel.border = element_rect(
+    colour = "gray",
+    fill = NA,
+    size = 1
+  ),
+  plot.margin = margin(5.5, -2.5, 12.5, 5.5, "pt")) +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         legend.position = "bottom",
         legend.text = element_text(angle = 45),
-        legend.key.width=unit(1,"cm")) +
+        legend.key.width=unit(1,"cm"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
   guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) +
   labs(title="Move 2 EI Surface",
        subtitle=bquote(xi["EI"] ~ " = " ~ .(xi_val)))
@@ -243,6 +257,17 @@ local_ucb = ggplot2::ggplot(circ_mesh_rad, aes(x, y)) +
                       size = 10) +
   coord_equal() + 
   theme_minimal() +
+  ggplot2::theme(legend.position="bottom",
+                 panel.border = element_rect(
+                   colour = "gray",
+                   fill = NA,
+                   size = 1
+                 )) +
+ theme(axis.title.y=element_blank(),
+                      axis.text.y=element_blank(),
+                      axis.ticks.y=element_blank())+
+theme(axis.title.x=element_text(color = gray(1,0))) +
+theme( plot.margin = margin(5.5, 7, 5.5, 5.5, "pt")) + 
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5),
         legend.position = "bottom",
@@ -254,7 +279,7 @@ local_ucb = ggplot2::ggplot(circ_mesh_rad, aes(x, y)) +
 
 # Plot for manuscript ----
 
-pdf(file = "./figures/section_3/example_acquisition_m2.pdf",
-    width = 8, height = 16/5)
-cowplot::plot_grid(local_pi, local_ei, local_ucb, nrow = 1)
-dev.off()
+# pdf(file = "./figures/section_3/example_acquisition_m2.pdf",
+#     width = 8, height = 18/5)
+# cowplot::plot_grid(local_pi, local_ei, local_ucb, rel_widths = c(1.175,.92,1), nrow = 1)
+# dev.off()

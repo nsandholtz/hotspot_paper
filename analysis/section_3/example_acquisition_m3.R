@@ -1,6 +1,5 @@
 library(dplyr)
 library(ggforce)
-source("~/Dropbox/Luke_Research/human_acquisition/manuscript/section_1/utils.R")
 
 # Source utilities
 source("./analysis/utils.R")
@@ -114,8 +113,7 @@ circle1 <- data.frame(
 m2_star = rbind(pi_max[1, c("x", "y")],
                 ei_max[1, c("x", "y")],
                 ucb_max[which(ucb_max$y <= 0), c("x", "y")])
-m2_star[1,] = c(40,0)
-# Need to manually change to c(40, 0)
+m2_star[1,] = c(40,0) # Need to manually change to c(40, 0)
 
 # GET HYPOTHETICAL MOVE 2
 
@@ -258,6 +256,18 @@ for(i in 1:3){
           legend.position = "bottom",
           legend.text = element_text(angle = 45),
           legend.key.width=unit(1,"cm")) +
+    ggplot2::theme(panel.border = element_rect(
+      colour = "gray",
+      fill = NA,
+      size = 1
+    ),
+    plot.margin = margin(5.5, -2.5, 5.5, 5.5, "pt")) + 
+    {if(i != 1 )  theme(axis.title.y=element_blank(),
+                        axis.text.y=element_blank(),
+                        axis.ticks.y=element_blank())}+
+    {if(i != 2 )  theme(axis.title.x=element_text(color = gray(1,0)),)} + 
+    {if(i == 2 )  theme( plot.margin = margin(5.5, -2.5, 14.5, -5.5, "pt"))}+
+    {if(i == 3 )  theme( plot.margin = margin(5.5, 13, 5.5, 5.5, "pt"))}+
     guides(fill = guide_colourbar(title.position="top", title.hjust = 0.5)) +
     labs(title= ifelse(i == 1,"Move 3 PI Surface",
                        ifelse(i == 2, "Move 3 EI Surface", 
@@ -267,12 +277,15 @@ for(i in 1:3){
 
 cowplot::plot_grid(m3_acq_plot[[1]],
                    m3_acq_plot[[2]],
-                   m3_acq_plot[[3]], nrow = 1)
-
-
-pdf(file = "./figures/section_3/example_acquisition_m3.pdf",
-    width = 10, height = 5)
-cowplot::plot_grid(
-                   m3_acq_plot[[1]], m3_acq_plot[[2]], m3_acq_plot[[3]], 
+                   m3_acq_plot[[3]],
+                   rel_widths = c(1.175,.95,1),
                    nrow = 1)
-dev.off()
+
+
+# pdf(file = "./figures/section_3/example_acquisition_m3.pdf",
+#     width = 10, height = 5)
+# cowplot::plot_grid(
+#                    m3_acq_plot[[1]], m3_acq_plot[[2]], m3_acq_plot[[3]], 
+#                    rel_widths = c(1.175,.95,1),
+#                    nrow = 1)
+# dev.off()
