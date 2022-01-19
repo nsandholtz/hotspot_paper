@@ -31,8 +31,8 @@ ok_event_dat = event_dat %>%
 
 model_cols = c("green", "blue", "red")
 
-pdf(file = "./figures/section_5/example_acquisition_fits_prospect.pdf",
-    width = 8, height = 16/5)
+# pdf(file = "./figures/section_5/example_acquisition_fits_prospect.pdf",
+#     width = 8, height = 16/5)
 par(mfrow = c(1,3))
 par(mar = c(5,.3,3,.3),
     oma = c(0,6,0,.1))
@@ -145,6 +145,11 @@ for(my_sub in c(21, 24, 28)) {
     kern_width = .15
   )
   
+  if(acquisition_fits_prospect[[my_sub]]$MAP$acq_type == "PI" &
+     acquisition_fits_prospect[[my_sub]]$MAP$par_val == 0){
+    acquisition_fits_prospect[[my_sub]]$MAP$acq_type = "UCB"
+      acquisition_fits_prospect[[my_sub]]$MAP$par_val = 0.5
+  }
   # PLOT
   acq_type_ind = ifelse(
     acquisition_fits_prospect[[my_sub]]$MAP$acq_type == "PI",
@@ -153,6 +158,7 @@ for(my_sub in c(21, 24, 28)) {
            2,
            3)
   )
+
   title_help = c("PI", "EI", "UCB")
   title_quote = c(
     bquote(.(title_help[acq_type_ind]) ~ "," ~ xi["PI"] ~ " = " ~ .(
@@ -172,7 +178,7 @@ for(my_sub in c(21, 24, 28)) {
     pch = 16,
     cex.lab = 1.5,
     ylab = expression(theta[2]),
-    xlab = expression(paste(Delta, r[1])),
+    xlab = ifelse(iter == 2, expression(paste(Delta, r[1])), ""),
     ylim = c(-pi, pi),
     xlim = range(r1_grid),
     axes = F,
@@ -338,4 +344,4 @@ for(my_sub in c(21, 24, 28)) {
        pos = 4, cex = 1)
   iter = iter + 1
 }
-dev.off()
+#dev.off()

@@ -58,45 +58,78 @@ for(my_sub in unique(event_dat$alt_id)){
                     size = round(length(rewards_1)*.8),
                     replace = F)
 
-  full_fits_threshold = list()
-  for(i in 1:3){ # LOOP OVER PI, EI, UCB
+ # full_fits_threshold = list()
+  
+  prob_old = prob_new = rep(.5, length(rewards_1[training]))
+  iter = 1
+  while ((iter == 1 | sum(abs(prob_new - prob_old)) >= .001) & iter < 10) {
+    prob_old = prob_new
     
-    my.cluster <- parallel::makeCluster(
-      n.cores, 
-      type = "PSOCK"
-    )
-    doParallel::registerDoParallel(cl = my.cluster)
-    
-    full_fits_threshold[[i]] <- foreach(
-      j = 1:length(acquisition_grid_threshold),
-      .combine = 'rbind',
-      .packages = c("tidyverse", "data.table", "pracma", "circular")
-    ) %dopar% {
-      sym_wc_log_lik_over_grid(
-        subject_rewards = rewards_1[training],
-        subject_targets = targets[training],
-        r1_grid = r1_grid,
-        acquisition_grid_ = acquisition_grid_threshold[[j]][[i]],
-        par_vals_ = par_vals[[i]],
-        scale_vals_ = scale_vals) %>%
-        mutate(threshold_val = threshold_vals[j],
-               acq_type = acq_types[i])
+    full_fits_threshold = list()
+    for(i in 1:3){ # LOOP OVER PI, EI, UCB
+      
+      my.cluster <- parallel::makeCluster(
+        n.cores, 
+        type = "PSOCK"
+      )
+      doParallel::registerDoParallel(cl = my.cluster)
+      
+      full_fits_threshold[[i]] <- foreach(
+        j = 1:length(acquisition_grid_threshold),
+        .combine = 'rbind',
+        .packages = c("tidyverse", "data.table", "pracma", "circular")
+      ) %dopar% {
+        sym_wc_log_lik_over_grid(
+          subject_rewards = rewards_1[training],
+          subject_targets = targets[training],
+          r1_grid = r1_grid,
+          acquisition_grid_ = acquisition_grid_threshold[[j]][[i]],
+          par_vals_ = par_vals[[i]],
+          scale_vals_ = scale_vals,
+          weights_ = prob_old) %>%
+          mutate(threshold_val = threshold_vals[j],
+                 acq_type = acq_types[i])
+      }
+      parallel::stopCluster(cl = my.cluster)
     }
-    parallel::stopCluster(cl = my.cluster)
-  }
-  full_fits_threshold = rbindlist(full_fits_threshold) %>%
+    full_fits_threshold = rbindlist(full_fits_threshold) %>%
       mutate(
         likelihood = exp(log_lik),
-        prior_prob = 1 / nrow(.), # Discrete uniform priors
+        prior_prob = 1 / nrow(.),
+        # Discrete uniform priors
         post_prob_un = likelihood * prior_prob,
-        log_post_prob_un = log_lik + log(prior_prob)
+        log_post_prob_un = log_lik + log(prior_prob),
       )
-  
-  log_norm_const = matrixStats::logSumExp(full_fits_threshold$log_post_prob_un)
-  
-  full_fits_threshold = full_fits_threshold %>%
-    mutate(log_post_prob_norm = log_post_prob_un - log_norm_const,
-           post_prob_norm = exp(log_post_prob_norm)) 
+    
+    log_norm_const = matrixStats::logSumExp(full_fits_threshold$log_post_prob_un)
+    
+    full_fits_threshold = full_fits_threshold %>%
+      mutate(
+        log_post_prob_norm = log_post_prob_un - log_norm_const,
+        post_prob_norm = exp(log_post_prob_norm)
+      ) %>%
+      arrange(desc(log_post_prob_un)) %>%
+      mutate(cum_post_prob = cumsum(post_prob_norm))
+    
+    MAP_iter = full_fits_threshold[which.max(full_fits_threshold$log_post_prob_un),]
+    map_acq_type = ifelse(MAP_iter$acq_type == "PI",
+                          1,
+                          ifelse(MAP_iter$acq_type == "EI", 2, 3))
+    
+    map_threshold_index = which(threshold_vals == MAP_iter$threshold_val)
+    map_acquisition_curve = pracma::interp2(
+      r1_grid,
+      par_vals[[map_acq_type]],
+      Z = acquisition_grid_threshold[[map_threshold_index]][[map_acq_type]],
+      xp = rewards_1[training],
+      yp = rep(MAP_iter$par_val, length(rewards_1[training]))
+    )
+    
+    h_theta_1 = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[training] - map_acquisition_curve))
+    h_theta_2 = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[training] + map_acquisition_curve))
+    prob_new = h_theta_1 / (h_theta_1 + h_theta_2)
+    iter = iter + 1
+  }
   
   # "marginalize" over scale parameter and sort
   model_sorter = full_fits_threshold %>%
@@ -110,6 +143,7 @@ for(my_sub in unique(event_dat$alt_id)){
   acquisition_fits_threshold[[my_sub]] = list()
   acquisition_fits_threshold[[my_sub]]$posterior = model_sorter[model_sorter$marg_post_norm > 1e-10, ]
   acquisition_fits_threshold[[my_sub]]$MAP = full_fits_threshold[which.max(full_fits_threshold$log_post_prob_un),]
+  acquisition_fits_threshold[[my_sub]]$w_est = mean(prob_new)
   
   # Out of sample log like
   map_acq_type = ifelse(acquisition_fits_threshold[[my_sub]]$MAP$acq_type == "PI",
@@ -122,12 +156,14 @@ for(my_sub in unique(event_dat$alt_id)){
     xp = rewards_1[-training],
     yp = rep(acquisition_fits_threshold[[my_sub]]$MAP$par_val, length(rewards_1[-training]))
   )
-  oos_log_lik = round(sym_wc_log_lik(data_vec = targets[-training],
-                                     peak_vec = oos_acquisition_curve,
-                                     scale = acquisition_fits_threshold[[my_sub]]$MAP$scale_val), digits = 2)
+  oos_log_lik = round(sym_wc_log_lik4(data_vec = targets[-training],
+                                      peak_vec = oos_acquisition_curve,
+                                      scale = acquisition_fits_threshold[[my_sub]]$MAP$scale_val,
+                                      weights = rep(acquisition_fits_threshold[[my_sub]]$w_est, length(rewards_1[-training]))), digits = 2)
   acquisition_fits_threshold[[my_sub]]$out_log_lik = oos_log_lik 
 }
 
 saveRDS(acquisition_fits_threshold, file = "./analysis/section_5/model_output/acquisition_fits_threshold.rds")
+
 
 

@@ -90,23 +90,21 @@ for(i in 1:3) {
 }
 
 
-#my.palette <- colorRampPalette(rev(RColorBrewer::brewer.pal(11, 'Spectral')), space='Lab')
 acquisition_plots = list()
 
 plot_titles = c(bquote("Move 2 Boundary " ~ widetilde("PI")), 
                 bquote("Move 2 Boundary " ~ widetilde("EI")),
                 bquote("Move 2 Boundary " ~ widetilde("UCB")))
 sub_titles = c(bquote(xi["PI"] ~ " = " ~ .(xi_val) ~ ", " ~ tau ~ " = " ~ pi/4),
-               bquote(xi["EI"] ~ " = " ~ .(xi_val)),
-               bquote(p ~ " = " ~ .(quant_val)))
-legend_titles = c(bquote(widetilde("PI")), bquote(widetilde("EI")), bquote(widetilde("UCB")))
+               bquote(xi["EI"] ~ " = " ~ .(xi_val) ~ ", " ~ tau ~ " = " ~ pi/4),
+               bquote(p ~ " = " ~ .(quant_val) ~ ", " ~ tau ~ " = " ~ pi/4))
+legend_titles = c(bquote("Augmented " ~ widetilde("PI")), bquote("Augmented " ~ widetilde("EI")), bquote("Augmented " ~ widetilde("UCB")))
 
 for(i in 1:3){
   acquisition_plots[[i]] = ggplot2::ggplot(data = acquisition_melt_full[[i]], 
                                            ggplot2::aes(x = r1, y = angle, fill = value)) +
     ggplot2::geom_tile() +
     ggplot2::scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "RdYlBu")),
-                                  #name = legend_titles[i]
                                   name = bquote(.(legend_titles[[i]]))) + 
     ggplot2::geom_line(data = acquisition_maxes[[i]],
                        color = "green3",
@@ -169,11 +167,11 @@ for(i in 1:3){
 }
 
 # Save pdf
-pdf(file = "./figures/section_5/aug_acquisition_surfaces_w_curves.pdf",
-    width = 8, height = 4.35)
-cowplot::plot_grid(acquisition_plots[[1]],
-                   acquisition_plots[[2]],
-                   acquisition_plots[[3]], rel_widths = c(1.175,.95,1),
-                   nrow = 1)
-dev.off()
+# pdf(file = "./figures/section_5/aug_acquisition_surfaces_w_curves.pdf",
+#     width = 8, height = 4.35)
+# cowplot::plot_grid(acquisition_plots[[1]],
+#                    acquisition_plots[[2]],
+#                    acquisition_plots[[3]], rel_widths = c(1.175,.95,1),
+#                    nrow = 1)
+# dev.off()
 

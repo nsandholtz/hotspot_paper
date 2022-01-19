@@ -65,7 +65,14 @@ for(my_sub in unique(event_dat$alt_id)){
   pos_train_inds = pos_inds[pos_inds %in% training]
   pos_test_inds = pos_inds[!(pos_inds %in% training)]
   
+  prob_old_neg = prob_new_neg = rep(.5, length(rewards_1[neg_train_inds]))
+  prob_old_pos = prob_new_pos = rep(.5, length(rewards_1[pos_train_inds]))
   
+  iter = 1
+  while ((iter == 1 | sum(abs(prob_new_neg - prob_old_neg), abs(prob_new_pos - prob_old_pos)) >= .001) & iter < 10) {
+    prob_old_neg = prob_new_neg
+    prob_old_pos = prob_new_pos
+    
   full_fits_threshold_neg = list()
   full_fits_threshold_pos = list()
   for(i in 1:3){ # LOOP OVER PI, EI, UCB
@@ -76,7 +83,8 @@ for(my_sub in unique(event_dat$alt_id)){
         r1_grid = r1_grid,
         acquisition_grid_ = acquisition_grid_threshold[[j]][[i]],
         par_vals_ = par_vals[[i]],
-        scale_vals_ = scale_vals) %>%
+        scale_vals_ = scale_vals,
+        weights_ = prob_old_neg) %>%
         mutate(threshold_val = threshold_vals[j],
                acq_type = acq_types[i])
       aug_fit_pos = sym_wc_log_lik_over_grid(
@@ -85,7 +93,8 @@ for(my_sub in unique(event_dat$alt_id)){
         r1_grid = r1_grid,
         acquisition_grid_ = acquisition_grid_threshold[[j]][[i]],
         par_vals_ = par_vals[[i]],
-        scale_vals_ = scale_vals) %>%
+        scale_vals_ = scale_vals,
+        weights_ = prob_old_pos) %>%
         mutate(threshold_val = threshold_vals[j],
                acq_type = acq_types[i])
       if(j == 1){
@@ -123,7 +132,44 @@ for(my_sub in unique(event_dat$alt_id)){
   
   full_fits_prospect = full_fits_prospect %>%
     mutate(log_post_prob_norm = log_post_prob_un - log_norm_const,
-           post_prob_norm = exp(log_post_prob_norm)) 
+           post_prob_norm = exp(log_post_prob_norm)) %>%
+    arrange(desc(log_post_prob_un)) %>%
+    mutate(cum_post_prob = cumsum(post_prob_norm))
+  
+  MAP_iter = full_fits_prospect[which.max(full_fits_prospect$log_post_prob_un),]
+  map_acq_type = ifelse(MAP_iter$acq_type == "PI",
+                        1,
+                        ifelse(MAP_iter$acq_type == "EI", 2, 3))
+  
+  map_threshold_index_neg = which(threshold_vals == MAP_iter$threshold_val.x)
+  map_threshold_index_pos = which(threshold_vals == MAP_iter$threshold_val.y)
+  
+  map_acquisition_curve_neg = pracma::interp2(
+    c(r1_grid[r1_grid < 0] ,0),
+    par_vals[[map_acq_type]],
+    Z = acquisition_grid_threshold[[map_threshold_index_neg]][[map_acq_type]][,r1_grid <= 0],
+    xp = rewards_1[neg_train_inds],
+    yp = rep(MAP_iter$par_val, length(rewards_1[neg_train_inds]))
+  )
+  map_acquisition_curve_pos = pracma::interp2(
+    r1_grid[r1_grid >= 0],
+    par_vals[[map_acq_type]],
+    Z = acquisition_grid_threshold[[map_threshold_index_pos]][[map_acq_type]][, r1_grid >= 0],
+    xp = rewards_1[pos_train_inds],
+    yp = rep(MAP_iter$par_val, length(rewards_1[pos_train_inds]))
+  )
+  
+  h_theta_1_neg = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[neg_train_inds] - map_acquisition_curve_neg))
+  h_theta_2_neg = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[neg_train_inds] + map_acquisition_curve_neg))
+  
+  h_theta_1_pos = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[pos_train_inds] - map_acquisition_curve_pos))
+  h_theta_2_pos = (1 / (2 * pi)) * sinh(MAP_iter$scale_val) / (cosh(MAP_iter$scale_val) - cos(targets[pos_train_inds] + map_acquisition_curve_pos))
+  
+  prob_new_neg = h_theta_1_neg / (h_theta_1_neg + h_theta_2_neg)
+  prob_new_pos = h_theta_1_pos / (h_theta_1_pos + h_theta_2_pos)
+  
+  iter = iter + 1
+  }
   
   # "marginalize" over scale parameter and sort
   model_sorter = full_fits_prospect %>%
@@ -137,6 +183,7 @@ for(my_sub in unique(event_dat$alt_id)){
   acquisition_fits_prospect[[my_sub]] = list()
   acquisition_fits_prospect[[my_sub]]$posterior = model_sorter[model_sorter$marg_post_norm > 1e-10, ]
   acquisition_fits_prospect[[my_sub]]$MAP = full_fits_prospect[which.max(full_fits_prospect$log_post_prob_un),]
+  acquisition_fits_prospect[[my_sub]]$w_est = mean(c(prob_new_neg, prob_new_pos))
   
 
   # Out of sample log like
@@ -160,12 +207,14 @@ for(my_sub in unique(event_dat$alt_id)){
     yp = rep(acquisition_fits_prospect[[my_sub]]$MAP$par_val, length(pos_test_inds))
   )
   
-  neg_oos_log_lik = round(sym_wc_log_lik(data_vec = targets[neg_test_inds],
+  neg_oos_log_lik = round(sym_wc_log_lik4(data_vec = targets[neg_test_inds],
                                          peak_vec = oos_acquisition_curve_neg,
-                                         scale = acquisition_fits_prospect[[my_sub]]$MAP$scale_val), digits = 2)  
-  pos_oos_log_lik = round(sym_wc_log_lik(data_vec = targets[pos_test_inds],
+                                         scale = acquisition_fits_prospect[[my_sub]]$MAP$scale_val,
+                                         weights = rep(mean(prob_new_neg), length(rewards_1[neg_test_inds]))), digits = 2)  
+  pos_oos_log_lik = round(sym_wc_log_lik4(data_vec = targets[pos_test_inds],
                                          peak_vec = oos_acquisition_curve_pos,
-                                         scale = acquisition_fits_prospect[[my_sub]]$MAP$scale_val), digits = 2)
+                                         scale = acquisition_fits_prospect[[my_sub]]$MAP$scale_val,
+                                         weights = rep(mean(prob_new_pos), length(rewards_1[pos_test_inds]))), digits = 2)  
   oos_log_lik = neg_oos_log_lik + pos_oos_log_lik
   acquisition_fits_prospect[[my_sub]]$out_log_lik = oos_log_lik 
 }

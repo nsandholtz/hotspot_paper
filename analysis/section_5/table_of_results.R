@@ -36,8 +36,9 @@ table_df$n_rounds = ok_sessions %>%
 table_df$map_family = unlist(lapply(acquisition_fits_prospect, function(x) x$MAP$acq_type))
 table_df$map_exp_param = unlist(lapply(acquisition_fits_prospect, function(x) x$MAP$par_val))
 table_df$map_thresh_neg = unlist(lapply(acquisition_fits_prospect, function(x) pi/2 - x$MAP$threshold_val.x))
-table_df$map_thresh_pos = unlist(lapply(acquisition_fits_prospect, function(x) pi/2 - x$MAP$threshold_val.x))
+table_df$map_thresh_pos = unlist(lapply(acquisition_fits_prospect, function(x) pi/2 - x$MAP$threshold_val.y))
 table_df$map_scale = unlist(lapply(acquisition_fits_prospect, function(x) round(x$MAP$scale_val, digits = 2)))
+table_df$w_est = unlist(lapply(acquisition_fits_prospect, function(x) round(x$w_est, digits = 2)))
 
 # Change PI at 0 to UCB at 0.5
 change_inds = which(table_df$map_family == "PI" & table_df$map_exp_param == 0)
@@ -73,9 +74,11 @@ table_print = table_df %>%
   select(map_family, map_exp_param,
          map_thresh_neg, map_thresh_pos,
          map_scale,
+         w_est,
          mean_m2_score,
          mean_m3_score,
-         mean_tot_score)
+         mean_tot_score
+         )
 xtable::xtable(table_print)
 
 # Other performance summaries ---------------------------------------------
