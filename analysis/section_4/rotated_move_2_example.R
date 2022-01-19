@@ -3,6 +3,7 @@
 # Source utilities
 library(tidyverse)
 source("./analysis/utils.R")
+source("./analysis/constants.R")
 
 # LOAD DATA ---------------------------------------------------------------
 
@@ -14,7 +15,7 @@ first_n = 20
 
 ok_sessions = session_dat %>%
   dplyr::filter(round_index > first_n,
-         dist_hotspot > round_max_dist) 
+                target_dist > session_max_dist) 
 
 
 subjects_to_plot = c(21, 24, 28)
@@ -64,10 +65,10 @@ rotated_move_2 = ggplot2::ggplot(data = example_dat,
   ) 
 rotated_move_2
   
-pdf(file = "./figures/section_4/rotated_move_2_example.pdf",
-      width = 8, height = 16/5)
-  rotated_move_2
-  dev.off()
+# pdf(file = "./figures/section_4/rotated_move_2_example.pdf",
+#       width = 8, height = 16/5)
+#   rotated_move_2
+#   dev.off()
 
 
 

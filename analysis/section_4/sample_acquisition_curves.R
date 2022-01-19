@@ -62,9 +62,9 @@ opt_curve_plots = list()
 my_palette = list(colorRampPalette(c("black", "green")),
                   colorRampPalette(c("black", "blue")),
                   colorRampPalette(c("black", "red")))
-plot_titles = c("Candidate PI Curves",
-                "Candidate EI Curves",
-                "Candidate UCB Curves")
+plot_titles = c("Sample PI Curves",
+                "Sample EI Curves",
+                "Sample UCB Curves")
 legend_titles = c(bquote(xi[PI] ~ " : "),
                   bquote(xi[EI] ~ " : "),
                   bquote(p ~ " : "))

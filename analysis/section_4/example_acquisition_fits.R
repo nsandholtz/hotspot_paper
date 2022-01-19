@@ -31,8 +31,8 @@ ok_event_dat = event_dat %>%
 
 model_cols = c("green", "blue", "red")
 
-pdf(file = "./figures/section_4/example_acquisition_fits.pdf",
-    width = 8, height = 16/5)
+# pdf(file = "./figures/section_4/example_acquisition_fits.pdf",
+#     width = 8, height = 16/5)
 par(mfrow = c(1,3))
 par(mar = c(5,.3,3,.3),
     oma = c(0,6,0,.1))
@@ -143,7 +143,7 @@ for(my_sub in c(21, 24, 28)) {
     pch = 16,
     cex.lab = 1.5,
     ylab = expression(theta[2]),
-    xlab = expression(paste(Delta, r[1])),
+    xlab = ifelse(iter == 2, expression(paste(Delta, r[1])), ""),
     ylim = c(-pi, pi),
     xlim = range(r1_grid),
     axes = F,
@@ -303,4 +303,4 @@ for(my_sub in c(21, 24, 28)) {
        pos = 4, cex = 1)
   iter = iter + 1
 }
-dev.off()
+#dev.off()
